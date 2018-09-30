@@ -1,21 +1,154 @@
 import React, { Component } from 'react';
-import { Editor, EditorState } from 'draft-js';
+import {Editor, EditorState, RichUtils , CompositeDecorator } from 'draft-js';
 
-class App extends Component {
+class App extends React.Component {
   constructor() {
     super();
-    this.state = {
-      editorState: EditorState.createEmpty(),
-    };
-  }
+    const compositeDecorator = new CompositeDecorator([
+      {
+        strategy: handleStrategy,
+        component: HandleSpan,
+      },
+      {
+        strategy: hashtagStrategy,
+        component: HashtagSpan,
+      },
+      {
+        strategy: highlightWorngWords,
+        component: HashtagSpan,
+      },
+      {
+        strategy: colorStrategy ,
+        component: HashtagSpan,
+      }
+    ]);
 
+    this.state = {
+      editorState: EditorState.createEmpty(compositeDecorator),
+    };
+    
+    this.focus = () => this.refs.editor.focus();
+    this.onChange = (editorState) => this.setState({editorState});
+    this.logState = () => console.log(this.state.editorState.toJS());
+  }
+  
   render() {
     return (
-      <Editor
-        editorState={this.state.editorState}
+      <div style={styles.root}>
+      <div style={styles.editor} onClick={this.focus}>
+        <Editor
+          editorState={this.state.editorState}
+          onChange={this.onChange}
+          placeholder="Write a tweet..."
+          ref="editor"
+        />
+      </div>
+      <input
+        onClick={this.logState}
+        style={styles.button}
+        type="button"
+        value="Log State"
       />
+    </div>
     );
   }
+
 }
+
+ /**
+       * Super simple decorators for handles and hashtags, for demonstration
+       * purposes only. Don't reuse these regexes.
+  */
+      const HANDLE_REGEX = /@[\w]+/g;
+      const HASHTAG_REGEX = /#[\w\u0590-\u05ff]+/g;
+      const COLOR_REGEX = /#[0-9A-Fa-f]{6}/g;
+
+      function highlightWorngWords(contentBlock, callback) {
+        let text = contentBlock.getText();
+        let worngWords = ['word', 'word1' , 'word2'];
+        let start ; 
+        worngWords.forEach(word => {
+          start = text.indexOf(word);
+          if (start !== -1) {
+             callback(start, start + word.length);
+          }
+        })
+      }
+      function colorStrategy(contentBlock, callback) {
+        const text = contentBlock.getText();
+        let matchArr, start;
+        while ((matchArr = COLOR_REGEX.exec(text)) !== null) {
+          console.log(matchArr);
+          start = matchArr.index;
+          callback(start, start + matchArr[0].length);
+        }
+      }
+
+      function handleStrategy(contentBlock, callback, contentState) {
+        findWithRegex(HANDLE_REGEX, contentBlock, callback);
+      }
+
+      function hashtagStrategy(contentBlock, callback, contentState) {
+        findWithRegex(HASHTAG_REGEX, contentBlock, callback);
+      }
+
+      function findWithRegex(regex, contentBlock, callback) {
+        const text = contentBlock.getText();
+        let matchArr, start;
+        while ((matchArr = regex.exec(text)) !== null) {
+          console.log(matchArr);
+          start = matchArr.index;
+          callback(start, start + matchArr[0].length);
+        }
+      }
+       // compnent 
+      const HandleSpan = (props) => {
+        return (
+          <span
+            style={styles.handle}
+            data-offset-key={props.offsetKey}
+          >
+            {props.children}
+          </span>
+        );
+      };
+
+      const HashtagSpan = (props) => {
+        return (
+          <span
+            style={styles.hashtag}
+            data-offset-key={props.offsetKey}
+          >
+            {props.children}
+          </span>
+        );
+      };
+      const styles = {
+        root: {
+          fontFamily: '\'Helvetica\', sans-serif',
+          padding: 20,
+          width: 600,
+        },
+        editor: {
+          border: '1px solid #ddd',
+          cursor: 'text',
+          fontSize: 16,
+          minHeight: 40,
+          padding: 10,
+        },
+        button: {
+          marginTop: 10,
+          textAlign: 'center',
+        },
+        handle: {
+          color: 'rgba(98, 177, 254, 1.0)',
+          direction: 'ltr',
+          unicodeBidi: 'bidi-override',
+        },
+        hashtag: {
+          color: 'rgba(95, 184, 138, 1.0)',
+        },
+      };
+
 
 export default App;
